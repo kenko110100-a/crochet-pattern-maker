@@ -129,7 +129,8 @@
   function refresh() {
     draw(); buildSide(); hint();
     $('#btnUndo').disabled = !undo.length; $('#btnRedo').disabled = !redo.length;
-    lib.save(doc);
+    // a chart just started is kept only once it differs from how it began (renamed or edited)
+    if (doc.id || JSON.stringify(doc) !== pristine) lib.save(doc);
   }
   function restore(from, to) {
     if (!from.length) return;
@@ -448,8 +449,9 @@
   window.addEventListener('blur', () => { shift = false; space = false; });
 
   // ---------- documents ----------
-  function openDoc(d) {
-    doc = d; sel = null; undo = []; redo = []; rowErr = null; adjSnap = null;
+  let pristine = null; // a new, not yet kept chart as it was when started
+  function openDoc(d, keep) {
+    doc = d; pristine = keep ? null : JSON.stringify(d); sel = null; undo = []; redo = []; rowErr = null; adjSnap = null;
     active = isKnit() ? 0 : doc.rows.length - 1;
     $('#start').hidden = true;
     $('#title').value = doc.title;
@@ -525,7 +527,7 @@
   $('#btnOpen').onclick = $('#btnOpen2').onclick = () => $('#fileOpen').click();
   $('#fileOpen').addEventListener('change', async e => {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-    try { const d = JSON.parse(await file.text()).doc; if (!valid(d)) throw 0; delete d.id; openDoc(d); } // opens as a new copy
+    try { const d = JSON.parse(await file.text()).doc; if (!valid(d)) throw 0; delete d.id; openDoc(d, true); } // opens as a new copy
     catch { alert(t('badFile')); }
   });
   function chartSVG(sized) {

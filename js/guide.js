@@ -145,7 +145,7 @@
     return `<figure class="art"><svg viewBox="${b.x + 12} ${b.y + 12} ${b.w - 24} ${b.h - 24}">${Crochet.render(doc, L, { exporting: !o.live, active: rows.length - 1, sel: o.sel })}</svg>
       <figcaption><b>${rows.length}</b> <code>${Crochet.toText(doc.rows[rows.length - 1].ops)}</code> <span class="${R.used === R.pc ? 'ok' : ''}">${status}</span></figcaption></figure>`;
   }
-  const shot = (name, withSpots) => `<figure class="shot"><div class="shot-box"><img src="guide/${name}-${cfg.lang}.jpg?v=4" alt="" loading="lazy">`
+  const shot = (name, withSpots) => `<figure class="shot"><div class="shot-box"><img src="guide/${name}-${cfg.lang}.jpg?v=5" alt="" loading="lazy">`
     + (withSpots ? SPOTS.map(([x, y], i) => `<span class="spot" style="left:${x}%;top:${y}%">${i + 1}</span>`).join('') : '') + '</div></figure>';
 
   function render() {
