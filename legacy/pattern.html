@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crochet Pattern Maker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="toolbar">
+  <a href="index.html" class="toolbar-back" title="Home">← Home</a>
+  <h1>Crochet Pattern Maker</h1>
+  <span class="mode-badge" id="modeBadge">Crochet in the Round</span>
+
+  <div class="toolbar-group">
+    <button class="toolbar-btn" id="btnUndo" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
+    <button class="toolbar-btn" id="btnRedo" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
+  </div>
+
+  <div class="toolbar-group">
+    <button class="toolbar-btn" id="btnZoomOut" title="Zoom out">−</button>
+    <button class="toolbar-btn" id="btnZoomReset" title="Reset zoom">100%</button>
+    <button class="toolbar-btn" id="btnZoomIn" title="Zoom in">+</button>
+  </div>
+
+  <button class="toolbar-btn danger" id="btnClear">Clear</button>
+
+  <div class="export-group">
+    <button class="toolbar-btn" id="btnExportPNG">Save PNG</button>
+    <button class="toolbar-btn primary" id="btnExportPDF">Save PDF</button>
+  </div>
+</div>
+
+<div id="layout">
+
+  <aside id="sidebar">
+    <h2>Stitches</h2>
+
+    <div class="palette-item" data-stitch="chain" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Chain</span>
+        <span class="abbr">ch</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="slipStitch" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Slip Stitch</span>
+        <span class="abbr">sl st</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="singleCrochet" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Single Crochet</span>
+        <span class="abbr">sc</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="halfDoubleCrochet" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Half Double</span>
+        <span class="abbr">hdc</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="doubleCrochet" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Double Crochet</span>
+        <span class="abbr">dc</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="trebleCrochet" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Treble Crochet</span>
+        <span class="abbr">tr</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="increase" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Increase</span>
+        <span class="abbr">inc</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="decrease" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Decrease</span>
+        <span class="abbr">dec</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="doubleTreble" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Double Treble</span>
+        <span class="abbr">dtr</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="bobble" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Bobble</span>
+        <span class="abbr">bob</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="shell" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Shell</span>
+        <span class="abbr">sh</span>
+      </div>
+    </div>
+
+    <div class="palette-item" data-stitch="picot" draggable="false">
+      <svg viewBox="-20 -20 40 40" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="palette-label">
+        <span class="name">Picot</span>
+        <span class="abbr">p</span>
+      </div>
+    </div>
+
+    <div id="rounds-section">
+      <h2 class="rounds-heading">Rounds</h2>
+      <div id="rounds-list"></div>
+    </div>
+
+    <div id="selected-section" style="display:none;">
+      <h2>Selected</h2>
+      <div class="selected-info">
+        <span id="selected-name">Stitch</span>
+        <span id="selected-level" class="selected-level-tag"></span>
+      </div>
+      <div class="selected-row">
+        <label class="selected-label">Color</label>
+        <input type="color" id="selected-color" value="#333333" />
+      </div>
+      <button class="selected-btn" id="selected-apply-level">Apply to round</button>
+      <button class="selected-btn selected-btn--danger" id="selected-delete">Delete stitch</button>
+    </div>
+
+    <div id="sidebar-footer">
+      Drag stitch onto canvas to place.<br/>
+      Snap = green ring indicator.<br/>
+      Scroll to zoom · drag to pan.<br/>
+      Click stitch to select &amp; recolor.
+    </div>
+  </aside>
+
+  <div id="canvasArea">
+    <svg id="mainSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="hint">Drag a stitch from the panel onto the magic ring to begin</div>
+    <div id="counter">Stitches: <strong id="stitchCount">0</strong></div>
+  </div>
+
+</div>
+
+<!-- jsPDF CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="stitches.js"></script>
+<script src="canvas.js"></script>
+<script src="interaction.js"></script>
+<script src="export.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

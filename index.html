@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crochet &amp; Knit Pattern Maker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+  <header id="bar">
+    <button class="btn ghost" id="btnHome" data-i18n="new" data-i18n-title="newTip">＋ New</button>
+    <input id="title" spellcheck="false" data-i18n-title="titleTip" />
+    <span id="badge"></span>
+    <span class="grow"></span>
+    <a class="btn ghost" href="guide.html" target="_blank" rel="noopener" data-i18n-title="guide">?</a>
+    <div class="seg">
+      <button class="btn" id="btnUndo" data-i18n-title="undoTip">↩</button>
+      <button class="btn" id="btnRedo" data-i18n-title="redoTip">↪</button>
+    </div>
+    <div class="seg">
+      <button class="btn" id="btnZoomOut" data-i18n-title="zoomOut">−</button>
+      <button class="btn" id="btnFit" data-i18n="fit" data-i18n-title="fitTip">Fit</button>
+      <button class="btn" id="btnZoomIn" data-i18n-title="zoomIn">+</button>
+    </div>
+    <select id="selStyle" class="btn" data-i18n-title="styleTip"></select>
+    <select id="selLang" class="btn lang" data-i18n-title="langTip">
+      <option value="en">English</option><option value="ja">日本語</option><option value="zh">繁體中文</option>
+    </select>
+    <div class="seg">
+      <button class="btn" id="btnSave" data-i18n="save" data-i18n-title="saveTip">Save</button>
+      <button class="btn" id="btnOpen" data-i18n="open" data-i18n-title="openTip">Open</button>
+    </div>
+    <details id="exportMenu">
+      <summary class="btn primary" data-i18n="export">Export</summary>
+      <div class="menu">
+        <button data-x="print" data-i18n="xPrint"></button>
+        <button data-x="png" data-i18n="xPng"></button>
+        <button data-x="svg" data-i18n="xSvg"></button>
+        <button data-x="txt" data-i18n="xTxt"></button>
+      </div>
+    </details>
+    <input type="file" id="fileOpen" accept=".json,application/json" hidden />
+  </header>
+
+  <aside id="palette"></aside>
+
+  <main id="stage">
+    <svg id="svg" xmlns="http://www.w3.org/2000/svg"><g id="view"><g id="chart"></g></g></svg>
+    <div id="hint"></div>
+  </main>
+
+  <aside id="side"></aside>
+</div>
+
+<div id="start">
+  <div class="start-card">
+    <div class="start-top">
+      <h1 data-i18n="appTitle">Crochet &amp; Knit Pattern Maker</h1>
+      <select id="selLang2" class="btn lang" data-i18n-title="langTip">
+        <option value="en">English</option><option value="ja">日本語</option><option value="zh">繁體中文</option>
+      </select>
+    </div>
+    <p class="lead" data-i18n="lead"></p>
+    <div class="modes">
+      <form data-mode="round">
+        <svg viewBox="-40 -40 80 80" id="icoRound"></svg>
+        <h2 data-i18n="mRound"></h2>
+        <p data-i18n="mRoundP"></p>
+        <label><span data-i18n="firstRound"></span> <input type="number" name="n" value="6" min="0" max="60" /> sc</label>
+        <button class="btn primary" data-i18n="start">Start</button>
+      </form>
+      <form data-mode="rows">
+        <svg viewBox="-40 -40 80 80" id="icoRows"></svg>
+        <h2 data-i18n="mRows"></h2>
+        <p data-i18n="mRowsP"></p>
+        <label><span data-i18n="foundChain"></span> <input type="number" name="n" value="16" min="1" max="200" /></label>
+        <button class="btn primary" data-i18n="start">Start</button>
+      </form>
+      <form data-mode="knit">
+        <svg viewBox="-40 -40 80 80" id="icoKnit"></svg>
+        <h2 data-i18n="mKnit"></h2>
+        <p data-i18n="mKnitP"></p>
+        <label><input type="number" name="w" value="20" min="1" max="120" /> <span data-i18n="stsX"></span>
+          <input type="number" name="h" value="20" min="1" max="200" /> <span data-i18n="rowsUnit"></span></label>
+        <label><select name="flat"><option value="1" data-i18n="flat"></option><option value="0" data-i18n="inRound"></option></select></label>
+        <button class="btn primary" data-i18n="start">Start</button>
+      </form>
+    </div>
+    <div class="start-foot">
+      <button class="btn" id="btnContinue" hidden></button>
+      <button class="btn" id="btnOpen2" data-i18n="openFile"></button>
+      <span class="grow"></span>
+      <a class="btn" href="guide.html" data-i18n="guide">How to use</a>
+    </div>
+  </div>
+</div>
+
+<div id="printSheet"></div>
+
+<script src="js/i18n.js"></script>
+<script src="js/crochet.js"></script>
+<script src="js/knit.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

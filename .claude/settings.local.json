@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:ronique.jp)",
+      "WebFetch(domain:omidsaffari.com)",
+      "Bash(python3 -)",
+      "Bash(node --check js/app.js)",
+      "Bash(node --check js/crochet.js)",
+      "Bash(node --check js/knit.js)",
+      "Bash(node --check js/i18n.js)",
+      "Bash(mkdir -p guide)",
+      "Bash(node --check js/guide.js)",
+      "Bash(cp __TRACKED_VAR__/mcp-Claude_Browser-blob-1794447525769-f5iy92.jpg guide/crochet-en.jpg)",
+      "Bash(cp __TRACKED_VAR__/mcp-Claude_Browser-blob-1794447535813-y2o7qd.jpg guide/knit-en.jpg)",
+      "Bash(cp __TRACKED_VAR__/mcp-Claude_Browser-blob-1794447535813-53qdk0.jpg guide/crochet-ja.jpg)",
+      "Bash(cp __TRACKED_VAR__/mcp-Claude_Browser-blob-1794447535813-3tqo02.jpg guide/knit-ja.jpg)",
+      "Bash(cp __TRACKED_VAR__/mcp-Claude_Browser-blob-1794447535813-1l42ny.jpg guide/crochet-zh.jpg)"
+    ]
+  }
+}

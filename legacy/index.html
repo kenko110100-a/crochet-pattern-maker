@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crochet Pattern Maker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="home">
+
+<header class="home-header">
+  <div class="home-header-inner">
+    <span class="logo-mark">✦</span>
+    <h1>Crochet Pattern Maker</h1>
+  </div>
+</header>
+
+<main class="home-main">
+  <p class="home-subtitle">Choose a pattern style to get started</p>
+
+  <div class="mode-grid">
+
+    <button class="mode-card" id="cardRound">
+      <div class="mode-icon">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="6" fill="none" stroke="#c47c3b" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <circle cx="40" cy="40" r="16" fill="none" stroke="#c47c3b" stroke-width="1" stroke-dasharray="3 2" opacity=".7"/>
+          <circle cx="40" cy="40" r="27" fill="none" stroke="#c47c3b" stroke-width="1" stroke-dasharray="3 2" opacity=".4"/>
+          <!-- sc symbols radiating -->
+          <line x1="40" y1="24" x2="37" y2="20" stroke="#333" stroke-width="1.2"/>
+          <line x1="40" y1="24" x2="43" y2="20" stroke="#333" stroke-width="1.2"/>
+          <line x1="52" y1="29" x2="56" y2="27" stroke="#333" stroke-width="1.2"/>
+          <line x1="52" y1="29" x2="55" y2="32" stroke="#333" stroke-width="1.2"/>
+          <line x1="55" y1="42" x2="59" y2="39" stroke="#333" stroke-width="1.2"/>
+          <line x1="55" y1="42" x2="59" y2="45" stroke="#333" stroke-width="1.2"/>
+          <line x1="40" y1="56" x2="37" y2="60" stroke="#333" stroke-width="1.2"/>
+          <line x1="40" y1="56" x2="43" y2="60" stroke="#333" stroke-width="1.2"/>
+          <line x1="28" y1="42" x2="21" y2="39" stroke="#333" stroke-width="1.2"/>
+          <line x1="28" y1="42" x2="21" y2="45" stroke="#333" stroke-width="1.2"/>
+          <circle cx="40" cy="40" r="2" fill="#888"/>
+        </svg>
+      </div>
+      <h2>Crochet in the Round</h2>
+      <p>Build circular patterns outward from a magic ring</p>
+      <span class="mode-tag">Round</span>
+    </button>
+
+    <button class="mode-card mode-card--soon" disabled>
+      <div class="mode-icon">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <line x1="12" y1="25" x2="68" y2="25" stroke="#bbb" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="12" y1="37" x2="68" y2="37" stroke="#bbb" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="12" y1="49" x2="68" y2="49" stroke="#bbb" stroke-width="1" stroke-dasharray="3 2"/>
+          <line x1="12" y1="61" x2="68" y2="61" stroke="#bbb" stroke-width="1" stroke-dasharray="3 2"/>
+          <!-- sc row symbols -->
+          <line x1="22" y1="30" x2="19" y2="25" stroke="#bbb" stroke-width="1.2"/>
+          <line x1="22" y1="30" x2="25" y2="25" stroke="#bbb" stroke-width="1.2"/>
+          <line x1="34" y1="30" x2="31" y2="25" stroke="#bbb" stroke-width="1.2"/>
+          <line x1="34" y1="30" x2="37" y2="25" stroke="#bbb" stroke-width="1.2"/>
+          <line x1="46" y1="30" x2="43" y2="25" stroke="#bbb" stroke-width="1.2"/>
+          <line x1="46" y1="30" x2="49" y2="25" stroke="#bbb" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <h2>Crochet in Rows</h2>
+      <p>Create flat pieces worked back and forth in rows</p>
+      <span class="mode-tag mode-tag--soon">Coming soon</span>
+    </button>
+
+    <button class="mode-card mode-card--soon" disabled>
+      <div class="mode-icon">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="40" cy="40" rx="10" ry="5" fill="none" stroke="#bbb" stroke-width="1.5" stroke-dasharray="3 2"/>
+          <ellipse cx="40" cy="40" rx="24" ry="12" fill="none" stroke="#bbb" stroke-width="1" stroke-dasharray="3 2" opacity=".7"/>
+          <ellipse cx="40" cy="40" rx="36" ry="18" fill="none" stroke="#bbb" stroke-width="1" stroke-dasharray="3 2" opacity=".4"/>
+        </svg>
+      </div>
+      <h2>Oval Crochet</h2>
+      <p>Work outward from a foundation chain in both directions</p>
+      <span class="mode-tag mode-tag--soon">Coming soon</span>
+    </button>
+
+  </div>
+</main>
+
+<!-- Modal for round setup -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="roundModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">Crochet in the Round</h2>
+    <p class="modal-desc">How many stitches in your first round?</p>
+    <div class="modal-input-row">
+      <button class="qty-btn" id="qtyMinus">−</button>
+      <input type="number" id="stitchCountInput" value="6" min="3" max="32" />
+      <button class="qty-btn" id="qtyPlus">+</button>
+    </div>
+    <p class="modal-hint">Typical starts: 6 sc for amigurumi, 8 for hats, 12 for flat circles</p>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn--cancel" id="modalCancel">Cancel</button>
+      <button class="modal-btn modal-btn--start" id="modalStart">Start Pattern →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const cardRound = document.getElementById('cardRound');
+  const backdrop = document.getElementById('modalBackdrop');
+  const input = document.getElementById('stitchCountInput');
+
+  cardRound.addEventListener('click', () => {
+    backdrop.classList.add('visible');
+    input.focus();
+    input.select();
+  });
+
+  document.getElementById('modalCancel').addEventListener('click', () => {
+    backdrop.classList.remove('visible');
+  });
+
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) backdrop.classList.remove('visible');
+  });
+
+  document.getElementById('qtyMinus').addEventListener('click', () => {
+    input.value = Math.max(3, parseInt(input.value) - 1);
+  });
+
+  document.getElementById('qtyPlus').addEventListener('click', () => {
+    input.value = Math.min(32, parseInt(input.value) + 1);
+  });
+
+  document.getElementById('modalStart').addEventListener('click', startRound);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') startRound(); });
+
+  function startRound() {
+    const n = Math.max(3, Math.min(32, parseInt(input.value) || 6));
+    window.location.href = `pattern.html?mode=round&stitches=${n}`;
+  }
+</script>
+
+</body>
+</html>
