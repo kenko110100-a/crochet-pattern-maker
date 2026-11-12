@@ -1,5 +1,5 @@
 'use strict';
-/* UI shell: start screen, palette, side panel, pan/zoom, undo, autosave, export. */
+/* UI shell: front page and chart library, stitch bar, side panel, pan/zoom, undo, export. */
 (() => {
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -8,23 +8,39 @@
   const store = {
     get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+    del(k) { try { localStorage.removeItem(k); } catch { /* storage unavailable */ } },
   };
 
   let doc = null, sel = null, active = 0, L = null, undo = [], redo = [], rowErr = null;
-  let sameSt = false, shift = false, space = false, drag = null;
+  let sameSt = false, shift = false, space = false, drag = null, adjSnap = null;
+  let clip = store.get('pm.clip', null);
   const view = { x: 0, y: 0, k: 2 };
-  const cfg = Object.assign({ lang: I18N.detect(), sc: 'x', knit: 'jis' }, store.get('pm.cfg', {}));
+  const cfg = Object.assign({ lang: I18N.detect(), sc: 'x', knit: 'jis', more: false }, store.get('pm.cfg', {}));
   I18N.set(cfg.lang);
   const t = I18N.t;
   const brush = { mode: 'sym', s: 'p', color: Knit.PALETTE[3] };
   const svg = $('#svg');
   const isKnit = () => doc && doc.type === 'knit';
   const nm = d => d[cfg.lang] || d.en;
-  const wn = n => t(doc.shape === 'round' ? 'roundN' : 'rowN', n);
+  const wn = n => t(doc.shape === 'rows' ? 'rowN' : 'roundN', n);
+  const kindKey = d => d.type === 'knit' ? 'mKnit' : d.shape === 'round' ? 'mRound' : d.shape === 'oval' ? 'mOval' : 'mRows';
 
-  // ---------- crochet palette ----------
+  // ---------- chart library: every chart is kept in this browser until it is deleted ----------
+  const lib = {
+    index: () => store.get('pm.index', []),
+    save(d) {
+      if (!d.id) d.id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      store.set('pm.d.' + d.id, d);
+      store.set('pm.index', [{ id: d.id, title: d.title, kind: kindKey(d), at: Date.now() }, ...lib.index().filter(e => e.id !== d.id)]);
+    },
+    load: id => store.get('pm.d.' + id, null),
+    remove(id) { store.del('pm.d.' + id); store.set('pm.index', lib.index().filter(e => e.id !== id)); },
+  };
+
+  // ---------- crochet stitch bar ----------
   const CPAL = [
-    ['secBasic', ['ch', 'sl', 'sc', 'hdc', 'dc', 'tr', 'dtr']],
+    ['secBasic', ['ch', 'sc', 'sctch', 'hdc', 'dc', 'tr', 'dtr', 'sl', 'join', 'sk'], true],
+    ['secTurn', ['tch1', 'sch2', 'sch3', 'sch4'], true],
     ['secInc', [
       { k: 'inc', g: ['sc', 'sc'], ab: 'inc', en: 'Sc increase (2 sc in one stitch)', ja: 'こま編み2目編み入れる', zh: '短針加針（1針放2針）' },
       { k: 'inc3', g: ['sc', 'sc', 'sc'], ab: 'sc ×3', en: '3 sc in one stitch', ja: 'こま編み3目編み入れる', zh: '短針1針放3針' },
@@ -36,39 +52,45 @@
     ]],
     ['secDec', ['sc2tog', 'sc3tog', 'hdc2tog', 'dc2tog', 'dc3tog', 'tr2tog']],
     ['secTex', ['scblo', 'fpdc', 'bpdc', 'cl', 'puff', 'pc', 'picot']],
-    ['secStruct', ['sk', 'tch', 'sch', 'join']],
   ];
+  const SPECIAL = {
+    sctch: { ab: 'tch+sc', nk: 'pSctch', ops: [{ t: 'tch', n: 1 }, { t: 'sc' }] },
+    tch1: { ab: 'tch 1', nk: 'pTch1', ops: [{ t: 'tch', n: 1 }] },
+    sch2: { ab: 'sch 2', nk: 'pSch2', ops: [{ t: 'sch', n: 2 }] },
+    sch3: { ab: 'sch 3', nk: 'pSch3', ops: [{ t: 'sch', n: 3 }] },
+    sch4: { ab: 'sch 4', nk: 'pSch4', ops: [{ t: 'sch', n: 4 }] },
+    sl: { ab: 'sl st', nk: 'pSl', ops: [{ t: 'sl' }] },
+    join: { ab: 'join', nk: 'pJoin', ops: [{ t: 'join' }] },
+  };
   const PITEM = {};
   CPAL.forEach(([, items]) => items.forEach(it => {
-    if (typeof it === 'string') {
-      const d = Crochet.ST[it];
-      PITEM[it] = { ...d, k: it, ab: it === 'tch' ? 'turn ch' : it === 'sch' ? 'ch = st' : (d.out || it), spec: it,
-        ops: [it === 'tch' ? { t: it, n: 1 } : it === 'sch' ? { t: it, n: 3 } : { t: it }] };
-    } else PITEM[it.k] = { ...it, spec: it.g, ops: [{ g: it.g.map(t => ({ t })) }] };
+    if (typeof it !== 'string') PITEM[it.k] = { ...it, spec: it.g, ops: [{ g: it.g.map(x => ({ t: x })) }] };
+    else if (SPECIAL[it]) PITEM[it] = { k: it, spec: it, ...SPECIAL[it] };
+    else { const d = Crochet.ST[it]; PITEM[it] = { ...d, k: it, ab: d.out || it, spec: it, ops: [{ t: it }] }; }
   }));
+  const pname = p => p.nk ? t(p.nk) : nm(p);
 
   function buildPalette() {
+    const grp = (title, body) => `<div class="pg"><div class="pg-h">${title}</div><div class="pg-b">${body}</div></div>`;
     let h = '<div id="palInfo"></div>';
     if (isKnit()) {
-      h += `<div class="pal-head">${t('symbols')}</div><div class="pal-grid">`;
-      const btn = k => `<button class="pal${brush.mode === 'sym' && brush.s === k ? ' on' : ''}" data-k="${k}">${Knit.preview(k, cfg.knit)}<span>${esc(Knit.SY[k].rs || t('noSt'))}</span></button>`;
+      const btn = k => `<button class="pal${Knit.SY[k].n ? ' cable' : ''}${brush.mode === 'sym' && brush.s === k ? ' on' : ''}" data-k="${k}">${Knit.preview(k, cfg.knit)}<span>${esc(Knit.SY[k].rs || t('noSt'))}</span></button>`;
       const keys = Object.keys(Knit.SY);
-      h += keys.filter(k => !Knit.SY[k].n).map(btn).join('');
-      h += `<button class="pal wide${brush.mode === 'erase' ? ' on' : ''}" data-k="erase"><span>${t('eraser')}</span></button></div>`;
-      h += `<div class="pal-head">${t('cables')}</div><div class="pal-grid two">` + keys.filter(k => Knit.SY[k].n).map(btn).join('') + '</div>';
-      h += `<div class="pal-head">${t('colours')}</div><div class="swatches">`;
-      Knit.PALETTE.forEach(c => { h += `<button class="sw${brush.mode === 'color' && brush.color === c ? ' on' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`; });
-      h += `</div><div class="pal-row"><input type="color" id="customColor" value="${brush.color}"> ${t('customColour')}</div>`;
+      h += grp(t('symbols'), keys.filter(k => !Knit.SY[k].n).map(btn).join('')
+        + `<button class="pal text${brush.mode === 'erase' ? ' on' : ''}" data-k="erase"><span>${t('eraser')}</span></button>`);
+      h += grp(t('cables'), keys.filter(k => Knit.SY[k].n).map(btn).join(''));
+      h += grp(t('colours'), Knit.PALETTE.map(c => `<button class="sw${brush.mode === 'color' && brush.color === c ? ' on' : ''}" data-c="${c}" style="background:${c}" title="${c}"></button>`).join('')
+        + `<input type="color" id="customColor" value="${brush.color}" title="${t('customColour')}">`);
     } else {
-      CPAL.forEach(([title, items]) => {
-        h += `<div class="pal-head">${t(title)}</div><div class="pal-grid">`;
-        items.forEach(it => {
+      CPAL.forEach(([title, items, always]) => {
+        if (!always && !cfg.more) return;
+        h += grp(t(title), items.map(it => {
           const p = PITEM[typeof it === 'string' ? it : it.k];
-          h += `<button class="pal" data-k="${p.k}">${Crochet.preview(p.spec, { plus: cfg.sc === '+' })}<span>${esc(p.ab)}</span></button>`;
-        });
-        h += '</div>';
+          return `<button class="pal" data-k="${p.k}" title="${esc(pname(p))}">${Crochet.preview(p.spec, { plus: cfg.sc === '+' })}<span>${esc(p.ab)}</span></button>`;
+        }).join(''));
       });
-      h += `<div class="pal-head">${t('modifier')}</div><div class="pal-grid"><button class="pal wide${sameSt ? ' on' : ''}" data-k="same"><span>${t(sameSt ? 'sameOn' : 'sameOff')}</span></button></div>`;
+      h += grp(t('modifier'), `<button class="pal text${sameSt ? ' on' : ''}" data-k="same"><span>${t(sameSt ? 'sameOn' : 'sameOff')}</span></button>`
+        + `<button class="pal text" data-k="more"><span>${t(cfg.more ? 'less' : 'more')}</span></button>`);
     }
     $('#palette').innerHTML = h;
     palInfo();
@@ -77,12 +99,10 @@
     const el = $('#palInfo'); if (!el) return;
     if (isKnit()) {
       const d = Knit.SY[k];
-      el.innerHTML = d ? `<b>${esc(nm(d))}</b><small>${esc(d.rs ? t('rsws', d.rs, d.ws) : d.en)}</small>`
-        : `<b>${t('paintGrid')}</b><small>${t('paintGridP')}</small>`;
+      el.innerHTML = d ? `<b>${esc(nm(d))}</b><small>${esc(d.rs ? t('rsws', d.rs, d.ws) : d.en)}</small>` : `<b>${t('paintGrid')}</b><small>${t('paintGridP')}</small>`;
     } else {
       const p = PITEM[k];
-      el.innerHTML = p ? `<b>${esc(nm(p))}</b><small>${esc(p.ab)}${cfg.lang !== 'en' ? ' · ' + esc(p.en) : ''}</small>`
-        : `<b>${t('addSt')}</b><small>${t('addStP')}</small>`;
+      el.innerHTML = p ? `<b>${esc(pname(p))}</b><small>${esc(p.ab)}</small>` : `<b>${t('addSt')}</b><small>${t('addStP')}</small>`;
     }
   }
   $('#palette').addEventListener('mouseover', e => { const b = e.target.closest('.pal'); palInfo(b && b.dataset.k); });
@@ -93,6 +113,7 @@
     const k = b.dataset.k;
     if (isKnit()) { if (k === 'erase') brush.mode = 'erase'; else { brush.mode = 'sym'; brush.s = k; } return buildPalette(); }
     if (k === 'same') { sameSt = !sameSt; return buildPalette(); }
+    if (k === 'more') { cfg.more = !cfg.more; store.set('pm.cfg', cfg); buildPalette(); return fit(); }
     addOps(PITEM[k].ops);
   });
   $('#palette').addEventListener('input', e => {
@@ -108,7 +129,7 @@
   function refresh() {
     draw(); buildSide(); hint();
     $('#btnUndo').disabled = !undo.length; $('#btnRedo').disabled = !redo.length;
-    store.set('pm.doc', doc);
+    lib.save(doc);
   }
   function restore(from, to) {
     if (!from.length) return;
@@ -119,16 +140,24 @@
   }
 
   // ---------- crochet editing ----------
-  function addOps(ops) {
-    const uses = ops.reduce((a, op) => a + Crochet.parOf(op), 0);
+  const lo = () => Math.min(sel.i, sel.i2 ?? sel.i), hi = () => Math.max(sel.i, sel.i2 ?? sel.i);
+  const selOps = () => sel && doc.rows[sel.r] ? doc.rows[sel.r].ops.slice(lo(), hi() + 1) : [];
+  /** The individual stitches the selection covers (group members are listed separately). */
+  function targets() {
+    const ops = selOps();
+    if (ops.length === 1 && ops[0].g && sel.j != null && ops[0].g[sel.j]) return [ops[0].g[sel.j]];
+    return ops.flatMap(op => op.g || [op]);
+  }
+  function addOps(ops, plain) {
+    const uses = ops.reduce((a, op) => a + Crochet.parOf(op), 0), starts = !ops[0].g && (ops[0].t === 'tch' || ops[0].t === 'sch');
     change(() => {
-      let row = doc.rows[active]; const R = L.rows[active], same = sameSt || shift;
-      const atEnd = !(sel && sel.r === active) || sel.i === row.ops.length - 1;
+      let row = doc.rows[active]; const R = L.rows[active], same = !plain && (sameSt || shift);
+      const atEnd = !(sel && sel.r === active) || hi() === row.ops.length - 1;
       // a finished round rolls over to the next one automatically
-      if (!same && uses && atEnd && active === doc.rows.length - 1 && row.ops.length && isFinite(R.pc) && R.used >= R.pc) {
+      if (!same && (uses || starts) && atEnd && active === doc.rows.length - 1 && row.ops.length && isFinite(R.pc) && R.used >= R.pc) {
         doc.rows.push({ ops: [] }); active++; sel = null; row = doc.rows[active];
       }
-      const idx = sel && sel.r === active ? sel.i + 1 : row.ops.length;
+      const idx = sel && sel.r === active ? hi() + 1 : row.ops.length;
       const one = ops.length === 1 && Crochet.isPlain(ops[0]) ? ops[0] : null, p = row.ops[idx - 1];
       if (same && one && p && (p.g || (Crochet.isPlain(p) && p.t !== 'ch' && p.t !== 'picot'))) {
         if (p.g) p.g.push(clone(one)); else row.ops[idx - 1] = { g: [p, clone(one)] };
@@ -144,8 +173,8 @@
     change(() => {
       if (sel && sel.r === active && row.ops[sel.i]) {
         const op = row.ops[sel.i];
-        if (op.g && sel.j != null) { op.g.splice(sel.j, 1); if (op.g.length === 1) row.ops[sel.i] = op.g[0]; sel = { r: active, i: sel.i }; }
-        else { row.ops.splice(sel.i, 1); sel = sel.i > 0 ? { r: active, i: sel.i - 1 } : null; }
+        if (op.g && sel.j != null && sel.i2 == null) { op.g.splice(sel.j, 1); if (op.g.length === 1) row.ops[sel.i] = op.g[0]; sel = { r: active, i: sel.i }; }
+        else { const a = lo(); row.ops.splice(a, hi() - a + 1); sel = a > 0 ? { r: active, i: a - 1 } : null; }
       } else if (row.ops.length) row.ops.pop();
       else { doc.rows.splice(active, 1); active = Math.max(0, active - 1); sel = null; }
     });
@@ -166,14 +195,16 @@
     if (k < 1) return;
     change(() => { row.ops = [...head, ...Array.from({ length: k }, () => clone(unit)).flat(), ...tail]; sel = null; });
   }
+  function copySel() { const ops = selOps(); if (ops.length) { clip = clone(ops); store.set('pm.clip', clip); buildSide(); } }
+  function pasteClip() { if (clip && clip.length && !isKnit()) addOps(clip, true); }
 
   // ---------- side panel ----------
   function buildSide() {
     if (isKnit()) return buildKnitSide();
-    const round = doc.shape === 'round', total = L.rows.reduce((a, R) => a + R.count, 0);
-    let h = `<div class="side-head"><h2>${t(round ? 'rounds' : 'rows')}</h2><span class="help">${t('nStitches', total)}</span></div>`;
-    h += round ? `<div class="found">${t('startRing')}</div>`
-      : `<div class="found">${t('foundChain')} <input type="number" id="chainN" min="1" max="300" value="${doc.chain}"></div>`;
+    const flat = doc.shape === 'rows', total = L.rows.reduce((a, R) => a + R.count, 0);
+    let h = `<div class="side-head"><h2>${t(flat ? 'rows' : 'rounds')}</h2><span class="help">${t('nStitches', total)}</span></div>`;
+    h += doc.shape === 'round' ? `<div class="found">${t('startRing')}</div>`
+      : `<div class="found">${t('foundChain')} <input type="number" id="chainN" min="${flat ? 1 : 3}" max="300" value="${doc.chain}"></div>`;
     h += '<div id="rows">';
     doc.rows.forEach((row, r) => {
       const R = L.rows[r], err = rowErr && rowErr.r === r ? rowErr : null;
@@ -193,24 +224,31 @@
         const canRep = isFinite(R.pc) && row.ops.length && R.used < R.pc;
         h += `<div class="row-tools">
           <button class="btn small" data-act="repeat" ${canRep ? '' : 'disabled'} title="${t('repeatTip')}">${t('repeat')}</button>
+          <button class="btn small" data-act="duprow" ${row.ops.length ? '' : 'disabled'}>${t('dupRow')}</button>
           <button class="btn small" data-act="clear" ${row.ops.length ? '' : 'disabled'}>${t('clear')}</button>
-          <button class="btn small" data-act="delrow" ${doc.rows.length > 1 ? '' : 'disabled'}>${t('del')}</button></div>`;
+          <button class="btn small" data-act="delrow" ${doc.rows.length > 1 ? '' : 'disabled'}>${t('del')}</button>
+          <label class="chk"><input type="checkbox" data-act="arc" ${row.arc ? 'checked' : ''}> ${t('arcs')}</label></div>`;
       }
       h += '</div>';
     });
-    h += `</div><button class="btn" id="addRow">${t(round ? 'newRound' : 'newRow')} <span class="help">(Enter)</span></button>`;
+    h += `</div><button class="btn" id="addRow">${t(flat ? 'newRow' : 'newRound')} <span class="help">(Enter)</span></button>`;
 
-    const op = sel && doc.rows[sel.r] && doc.rows[sel.r].ops[sel.i];
-    if (op) {
-      const m = op.g && sel.j != null ? op.g[sel.j] : op;
-      const label = m.g ? t('nInOne', m.g.length) : nm(Crochet.ST[m.t]);
-      const col = (m.g ? m.g[0].c : m.c) || L.rows[sel.r].color;
+    const tg = sel ? targets() : [];
+    if (tg.length) {
+      const n = hi() - lo() + 1, m = tg[0], a = m.adj || {};
+      const label = n > 1 ? t('nSelected', tg.length) : tg.length > 1 ? t('nInOne', tg.length) : (m.t === 'sch' || m.t === 'tch') ? `${nm(Crochet.ST[m.t])} · ${m.n} ch` : nm(Crochet.ST[m.t]);
+      const sl = (k, min, max, v, unit) => `<div class="line adj"><span>${t({ a: 'tilt', l: 'length', x: 'shiftX', y: 'shiftY' }[k])}</span>
+        <input type="range" data-adj="${k}" min="${min}" max="${max}" value="${v}"><output>${v}${unit}</output></div>`;
       h += `<div class="panel"><h3>${t('selected')}</h3><div class="line"><b>${esc(label)}</b></div>
-        <div class="line"><input type="color" value="${col}" data-act="stcolor"> ${t('colour')}
-        <span class="grow"></span><button class="btn small" data-act="delst">${t('del')}</button></div>
-        <div class="help">${t('afterSel')}</div></div>`;
-    }
-    if (round) h += `<div class="panel"><label class="line"><input type="checkbox" data-act="guides" ${doc.guides !== false ? 'checked' : ''}> ${t('guides')}</label></div>`;
+        <div class="line"><input type="color" value="${m.c || L.rows[sel.r].color}" data-act="stcolor"> ${t('colour')}<span class="grow"></span>
+          <button class="btn small" data-act="copy">${t('copy')}</button>
+          <button class="btn small" data-act="paste" ${clip ? '' : 'disabled'}>${t('paste')}</button>
+          <button class="btn small" data-act="delst">${t('del')}</button></div>
+        <div class="help">${t('afterSel')} ${t('rangeTip')}</div>
+        <h3 class="sub">${t('adjust')} <button class="btn small" data-act="resetadj" ${tg.some(x => x.adj) ? '' : 'disabled'}>${t('reset')}</button></h3>
+        ${sl('a', -75, 75, a.a || 0, '°')}${sl('l', 40, 250, Math.round((a.l || 1) * 100), '%')}${sl('x', -30, 30, a.x || 0, '')}${sl('y', -30, 30, a.y || 0, '')}</div>`;
+    } else if (clip) h += `<div class="panel"><div class="line"><button class="btn small" data-act="paste">${t('paste')}</button><span class="help">${esc(Crochet.toText(clip))}</span></div></div>`;
+    h += `<div class="panel"><label class="line"><input type="checkbox" data-act="guides" ${doc.guides !== false ? 'checked' : ''}> ${t(flat ? 'guidesRow' : 'guides')}</label></div>`;
     const ex = [['sc 6', 'h1'], ['inc', 'h2'], ['(sc 2, inc) x6', 'h3'], ['(sc, inc) x', 'h4'], ['[dc 2, ch 2, dc 2]', 'h5'],
       ['ch 3', 'h6'], ['sk 2', 'h7'], ['sch 3', 'h8'], ['tch 1', 'h9'], ['join', 'h10']];
     h += `<div class="panel"><h3>${t('typing')}</h3><div class="help">${t('typingIntro')}<br>`
@@ -228,15 +266,19 @@
   $('#side').addEventListener('click', e => {
     if (isKnit()) return;
     const rowEl = e.target.closest('.row'), act = e.target.closest('[data-act]');
-    if (e.target.id === 'addRow' || e.target.closest('#addRow')) return newRow();
+    if (e.target.closest('#addRow')) return newRow();
     if (act && act.tagName === 'BUTTON') {
       const a = act.dataset.act;
       if (a === 'repeat') return repeatToEnd();
+      if (a === 'duprow') return change(() => { doc.rows.splice(active + 1, 0, clone(doc.rows[active])); active++; sel = null; });
       if (a === 'clear') return change(() => { doc.rows[active].ops = []; sel = null; });
       if (a === 'delrow') return change(() => { doc.rows.splice(active, 1); active = Math.max(0, active - 1); sel = null; });
       if (a === 'delst') return delSel();
+      if (a === 'copy') return copySel();
+      if (a === 'paste') return pasteClip();
+      if (a === 'resetadj') return change(() => targets().forEach(m => { delete m.adj; }));
     }
-    if (rowEl && !e.target.matches('input')) { active = +rowEl.dataset.r; sel = null; refresh(); }
+    if (rowEl && !e.target.matches('input, label')) { active = +rowEl.dataset.r; sel = null; refresh(); }
   });
   $('#side').addEventListener('focusin', e => {
     const rowEl = e.target.closest('.row');
@@ -246,27 +288,43 @@
       draw(); hint();
     }
   });
+  // sliders: redraw live while dragging, record one undo step when released
+  $('#side').addEventListener('input', e => {
+    const k = e.target.dataset.adj; if (!k || isKnit()) return;
+    if (!adjSnap) adjSnap = JSON.stringify(doc);
+    const v = +e.target.value;
+    targets().forEach(m => { m.adj = m.adj || {}; m.adj[k] = k === 'l' ? v / 100 : v; });
+    e.target.nextElementSibling.textContent = v + (k === 'a' ? '°' : k === 'l' ? '%' : '');
+    draw();
+  });
   $('#side').addEventListener('change', e => {
-    const t = e.target, rowEl = t.closest('.row');
+    const el = e.target, rowEl = el.closest('.row');
     if (isKnit()) {
-      if (t.id === 'kw' || t.id === 'kh') return change(() => Knit.resize(doc, +$('#kw').value || doc.w, +$('#kh').value || doc.h));
-      if (t.id === 'kflat') return change(() => { doc.flat = t.value === '1'; });
+      if (el.id === 'kw' || el.id === 'kh') return change(() => Knit.resize(doc, +$('#kw').value || doc.w, +$('#kh').value || doc.h));
+      if (el.id === 'kflat') return change(() => { doc.flat = el.value === '1'; });
       return;
     }
-    if (t.id === 'chainN') return change(() => { doc.chain = clamp(+t.value || 1, 1, 300); });
-    if (t.dataset.act === 'guides') return change(() => { doc.guides = t.checked; });
-    if (t.dataset.act === 'stcolor') return change(() => {
-      const op = doc.rows[sel.r].ops[sel.i];
-      (op.g ? (sel.j != null ? [op.g[sel.j]] : op.g) : [op]).forEach(m => { m.c = t.value; });
-    });
+    if (el.dataset.adj) {
+      targets().forEach(m => {
+        const a = m.adj || {};
+        ['a', 'x', 'y'].forEach(k => { if (!a[k]) delete a[k]; }); if (a.l === 1) delete a.l;
+        if (!Object.keys(a).length) delete m.adj;
+      });
+      if (adjSnap) { undo.push(adjSnap); redo = []; adjSnap = null; }
+      return refresh();
+    }
+    if (el.id === 'chainN') return change(() => { doc.chain = clamp(+el.value || 1, doc.shape === 'oval' ? 3 : 1, 300); });
+    if (el.dataset.act === 'guides') return change(() => { doc.guides = el.checked; });
+    if (el.dataset.act === 'arc') return change(() => { if (el.checked) doc.rows[active].arc = true; else delete doc.rows[active].arc; });
+    if (el.dataset.act === 'stcolor') return change(() => targets().forEach(m => { m.c = el.value; }));
     if (!rowEl) return;
     const r = +rowEl.dataset.r;
-    if (t.dataset.act === 'rowcolor') return change(() => { doc.rows[r].color = t.value; });
-    if (t.classList.contains('txt')) {
+    if (el.dataset.act === 'rowcolor') return change(() => { doc.rows[r].color = el.value; });
+    if (el.classList.contains('txt')) {
       try {
-        const ops = Crochet.parse(t.value, L.rows[r].pc);
+        const ops = Crochet.parse(el.value, L.rows[r].pc);
         change(() => { doc.rows[r].ops = ops; active = r; sel = null; });
-      } catch (err) { rowErr = { r, msg: err.message, text: t.value }; active = r; refresh(); }
+      } catch (err) { rowErr = { r, msg: err.message, text: el.value }; active = r; refresh(); }
     }
   });
 
@@ -322,7 +380,7 @@
     if (!doc || e.button === 2) return;
     svg.setPointerCapture(e.pointerId);
     if (isKnit() && !space && e.button === 0) { undo.push(JSON.stringify(doc)); drag = { paint: true, changed: false }; paintAt(e); }
-    else { drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false, target: e.target }; }
+    else { drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false, target: e.target, shift: e.shiftKey }; }
   });
   svg.addEventListener('pointermove', e => {
     if (!drag) return;
@@ -338,8 +396,11 @@
     if (d.paint) { if (d.changed) { redo = []; refresh(); } else undo.pop(); return; }
     if (d.moved || isKnit()) return;
     const st = d.target.closest && d.target.closest('.st');
-    if (st) { const [r, i, j] = st.dataset.p.split(',').map(Number); active = r; sel = { r, i, j: Number.isNaN(j) ? null : j }; }
-    else sel = null;
+    if (st) {
+      const [r, i, j] = st.dataset.p.split(',').map(Number);
+      if (d.shift && sel && sel.r === r) sel = { r, i: sel.i, i2: i };  // shift-click extends the selection along the round
+      else { active = r; sel = { r, i, j: Number.isNaN(j) ? null : j }; }
+    } else sel = null;
     refresh();
   };
   svg.addEventListener('pointerup', endDrag);
@@ -359,14 +420,17 @@
   // ---------- keyboard ----------
   document.addEventListener('keydown', e => {
     if (e.key === 'Shift') shift = true;
-    const field = e.target.matches && e.target.matches('input, select, textarea');
+    const field = e.target.matches && e.target.matches('input:not([type=range]):not([type=checkbox]), select, textarea');
     if (field) { if (e.key === 'Enter' && e.target.classList.contains('txt')) e.target.blur(); return; }
     if (!doc || !$('#start').hidden) return;
     if (e.code === 'Space') { space = true; svg.classList.remove('paint'); e.preventDefault(); return; }
     const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
     if (mod && key === 'z') { e.preventDefault(); return e.shiftKey ? restore(redo, undo) : restore(undo, redo); }
     if (mod && key === 'y') { e.preventDefault(); return restore(redo, undo); }
-    if (isKnit() || mod) return;
+    if (isKnit()) return;
+    if (mod && key === 'c') { if (sel) { e.preventDefault(); copySel(); } return; }
+    if (mod && key === 'v') { if (clip) { e.preventDefault(); pasteClip(); } return; }
+    if (mod) return;
     const row = doc.rows[active];
     if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); delSel(); }
     else if (e.key === 'Enter') { e.preventDefault(); newRow(); }
@@ -385,47 +449,63 @@
 
   // ---------- documents ----------
   function openDoc(d) {
-    doc = d; sel = null; undo = []; redo = []; rowErr = null;
+    doc = d; sel = null; undo = []; redo = []; rowErr = null; adjSnap = null;
     active = isKnit() ? 0 : doc.rows.length - 1;
     $('#start').hidden = true;
     $('#title').value = doc.title;
     svg.classList.toggle('paint', !!isKnit());
     chrome(); draw(); fit(); refresh();
   }
-  /** Everything whose text depends on the language: static labels, badge, style menu, palette. */
+  function valid(d) {
+    if (!d || typeof d !== 'object') return false;
+    if (d.type === 'knit') return Array.isArray(d.cells) && d.cells.length === d.h && d.cells.every(r => Array.isArray(r) && r.length === d.w && r.every(c => c && (Knit.SY[c.s] || c.s === '_')));
+    if (d.type === 'crochet') return ['round', 'rows', 'oval'].includes(d.shape) && Array.isArray(d.rows) && d.rows.length > 0
+      && d.rows.every(r => Array.isArray(r.ops) && r.ops.every(op => (op.g || [op]).every(m => Crochet.ST[m.t])));
+    return false;
+  }
+  /** Everything whose text depends on the language: static labels, badge, style menu, stitch bar, chart list. */
   function chrome() {
     I18N.apply();
     $('#selLang').value = $('#selLang2').value = cfg.lang;
-    const saved = store.get('pm.doc', null), b = $('#btnContinue');
-    b.hidden = !valid(saved);
-    if (!b.hidden) b.textContent = t('continue', saved.title);
+    const keep = $('#selFirst').value || 'sc';
+    $('#selFirst').innerHTML = ['sc', 'hdc', 'dc'].map(k => `<option value="${k}">${esc(nm(Crochet.ST[k]))}</option>`).join('');
+    $('#selFirst').value = keep;
+    const ix = lib.index(), tag = cfg.lang === 'zh' ? 'zh-Hant' : cfg.lang;
+    $('#lib').innerHTML = ix.length ? `<h2>${t('myCharts')}</h2><div class="lib-list">` + ix.map(e =>
+      `<div class="lib-item" data-id="${e.id}"><b>${esc(e.title)}</b><span>${t(e.kind)} · ${new Date(e.at).toLocaleDateString(tag)}</span>
+        <button class="btn small" data-del="1">${t('del')}</button></div>`).join('') + '</div>' : '';
     if (!doc) return;
-    $('#badge').textContent = t(isKnit() ? 'mKnit' : doc.shape === 'round' ? 'mRound' : 'mRows');
+    $('#badge').textContent = t(kindKey(doc));
     $('#selStyle').innerHTML = isKnit()
       ? `<option value="jis">${t('styleJis')}</option><option value="west">${t('styleWest')}</option>`
       : `<option value="x">${t('scX')}</option><option value="+">${t('scPlus')}</option>`;
     $('#selStyle').value = isKnit() ? cfg.knit : cfg.sc;
     buildPalette();
   }
-  function valid(d) {
-    if (!d || typeof d !== 'object') return false;
-    if (d.type === 'knit') return Array.isArray(d.cells) && d.cells.length === d.h && d.cells.every(r => Array.isArray(r) && r.length === d.w && r.every(c => c && Knit.SY[c.s] || c.s === '_'));
-    if (d.type === 'crochet') return Array.isArray(d.rows) && d.rows.length > 0 && d.rows.every(r => Array.isArray(r.ops) && r.ops.every(op => (op.g || [op]).every(m => Crochet.ST[m.t])));
-    return false;
-  }
+  $('#lib').addEventListener('click', e => {
+    const item = e.target.closest('.lib-item'); if (!item) return;
+    const d = lib.load(item.dataset.id);
+    if (e.target.dataset.del) { if (confirm(t('confirmDel', d ? d.title : ''))) { lib.remove(item.dataset.id); if (doc && doc.id === item.dataset.id) doc = null; chrome(); } return; }
+    if (valid(d)) openDoc(d);
+  });
   document.querySelectorAll('.modes form').forEach(form => form.addEventListener('submit', e => {
     e.preventDefault();
-    const m = form.dataset.mode, v = n => +form.elements[n].value;
-    if (m === 'knit') openDoc(Knit.newDoc(clamp(v('w') || 20, 1, 120), clamp(v('h') || 20, 1, 200), form.elements.flat.value === '1'));
-    else if (m === 'round') openDoc({ type: 'crochet', shape: 'round', title: t('untitledC'), guides: true,
-      rows: [{ ops: Array.from({ length: clamp(v('n') || 0, 0, 60) }, () => ({ t: 'sc' })) }] });
-    else openDoc({ type: 'crochet', shape: 'rows', title: t('untitledC'), chain: clamp(v('n') || 16, 1, 200), rows: [{ ops: [] }] });
+    const m = form.dataset.mode, v = k => +form.elements[k].value, many = (n, k) => Array.from({ length: Math.max(0, n) }, () => ({ t: k }));
+    const turn = form.elements.turn && form.elements.turn.checked;
+    if (m === 'knit') return openDoc(Knit.newDoc(clamp(v('w') || 20, 1, 120), clamp(v('h') || 20, 1, 200), form.elements.flat.value === '1'));
+    const d = { type: 'crochet', shape: m, title: t('untitledC'), guides: true, rows: [{ ops: [] }] };
+    if (m === 'round') { // first round in the chosen stitch, with the turning chain that stitch needs
+      const n = clamp(v('n') || 0, 0, 60), k = form.elements.st.value;
+      d.rows[0].ops = !n ? [] : !turn ? many(n, k) : k === 'sc' ? [{ t: 'tch', n: 1 }, ...many(n, 'sc'), { t: 'join' }]
+        : [{ t: 'sch', n: k === 'hdc' ? 2 : 3 }, ...many(n - 1, k), { t: 'join' }];
+    } else d.chain = clamp(v('n') || 10, m === 'oval' ? 3 : 1, 200);
+    if (m === 'oval') { // sc along the top, 3 into the far end, back along the bottom, 2 more into the first chain
+      const N = d.chain, g = n => ({ g: many(n, 'sc') });
+      d.rows[0].ops = [...(turn ? [{ t: 'tch', n: 1 }] : []), ...many(N - 1, 'sc'), g(3), ...many(N - 2, 'sc'), g(2), ...(turn ? [{ t: 'join' }] : [])];
+    }
+    openDoc(d);
   }));
-  function showStart() {
-    chrome();
-    $('#start').hidden = false;
-  }
-  $('#btnContinue').onclick = () => openDoc(store.get('pm.doc', null));
+  function showStart() { chrome(); $('#start').hidden = false; }
   $('#btnHome').onclick = showStart;
   $('#title').addEventListener('change', e => change(() => { doc.title = e.target.value.trim() || t('untitled'); }));
   $('#selLang').onchange = $('#selLang2').onchange = e => {
@@ -441,11 +521,11 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
-  $('#btnSave').onclick = () => download(fileName('json'), new Blob([JSON.stringify({ app: 'pattern-maker', v: 1, doc }, null, 1)], { type: 'application/json' }));
+  $('#btnSave').onclick = () => download(fileName('json'), new Blob([JSON.stringify({ app: 'pattern-maker', v: 2, doc }, null, 1)], { type: 'application/json' }));
   $('#btnOpen').onclick = $('#btnOpen2').onclick = () => $('#fileOpen').click();
   $('#fileOpen').addEventListener('change', async e => {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-    try { const d = JSON.parse(await file.text()).doc; if (!valid(d)) throw 0; openDoc(d); }
+    try { const d = JSON.parse(await file.text()).doc; if (!valid(d)) throw 0; delete d.id; openDoc(d); } // opens as a new copy
     catch { alert(t('badFile')); }
   });
   function chartSVG(sized) {
@@ -458,7 +538,7 @@
   const writtenLines = () => isKnit() ? Knit.written(doc) : Crochet.written(doc, L);
   function keyHTML() {
     if (isKnit()) return Knit.usedTypes(doc).filter(k => k !== '_').map(k => { const d = Knit.SY[k]; return `<div>${Knit.preview(k, cfg.knit)}<span><b>${esc(d.rs || '—')}</b> ${esc(nm(d))}</span></div>`; }).join('');
-    return Crochet.usedTypes(doc).map(t => { const d = Crochet.ST[t]; return `<div>${Crochet.preview(t, { plus: cfg.sc === '+' })}<span><b>${esc(d.out || t)}</b> ${esc(nm(d))}</span></div>`; }).join('');
+    return Crochet.usedTypes(doc).map(k => { const d = Crochet.ST[k]; return `<div>${Crochet.preview(k, { plus: cfg.sc === '+' })}<span><b>${esc(d.out || k)}</b> ${esc(nm(d))}</span></div>`; }).join('');
   }
   $('#exportMenu').addEventListener('click', e => {
     const x = e.target.dataset.x; if (!x) return;
@@ -484,13 +564,15 @@
   document.addEventListener('click', e => { if (!e.target.closest('#exportMenu')) $('#exportMenu').open = false; });
 
   // ---------- start-screen icons, drawn with the real engines ----------
-  function icon(id, d) {
-    const l = Crochet.layout(d), b = l.bounds;
-    const el = $(id); el.setAttribute('viewBox', `${b.x + 14} ${b.y + 14} ${b.w - 28} ${b.h - 28}`);
-    el.innerHTML = Crochet.render(d, l, { exporting: true });
+  function icon(id, d, texts) {
+    texts.forEach((txt, i) => { d.rows.push({ ops: [] }); d.rows[i].ops = Crochet.parse(txt, Crochet.layout(d).rows[i].pc); });
+    const l = Crochet.layout(d), b = l.bounds, el = $(id);
+    el.setAttribute('viewBox', `${b.x + 16} ${b.y + 16} ${b.w - 32} ${b.h - 32}`);
+    el.innerHTML = Crochet.render(d, l, { exporting: true }).replace(/<text[^>]*>[^<]*<\/text>/g, '');
   }
-  icon('#icoRound', { shape: 'round', guides: false, rows: [{ ops: Crochet.parse('sc 6', Infinity) }, { ops: Crochet.parse('inc 6', 6) }, { ops: Crochet.parse('(dc, ch) x12', 12) }] });
-  icon('#icoRows', { shape: 'rows', chain: 7, rows: [{ ops: Crochet.parse('tch 1, sc 7', 7) }, { ops: Crochet.parse('sch 3, dc 6', 7) }, { ops: Crochet.parse('tch 1, sc 7', 7) }] });
+  icon('#icoRound', { shape: 'round', guides: false, rows: [] }, ['sc 6', 'inc 6', '(dc, ch) x']);
+  icon('#icoRows', { shape: 'rows', chain: 7, guides: false, rows: [] }, ['tch 1, sc 7', 'sch 3, dc 6', 'tch 1, sc 7']);
+  icon('#icoOval', { shape: 'oval', chain: 5, guides: false, rows: [] }, ['sc 4, [sc 3], sc 3, [sc 2]', 'inc, sc 3, inc 3, sc 3, inc 2']);
   (() => {
     const d = Knit.newDoc(5, 5, true);
     [[0, 1, 'yo'], [0, 2, 'k2tog'], [1, 3, 'p'], [2, 1, 'p'], [2, 3, 'ssk'], [2, 4, 'yo'], [3, 0, 'c1l'], [4, 2, 'yo'], [4, 3, 'cdd']].forEach(([r, c, s]) => Knit.paint(d, r, c, { mode: 'sym', s }));
@@ -498,6 +580,11 @@
     const el = $('#icoKnit'); el.setAttribute('viewBox', `-4 -4 ${5 * Knit.S + 8} ${5 * Knit.S + 8}`);
     el.innerHTML = Knit.render(d, {}).svg.replace(/<text[^>]*>[^<]*<\/text>/g, '');
   })();
+
+  // charts saved by the earlier single-slot version move into the library
+  const old = store.get('pm.doc', null);
+  if (valid(old)) lib.save(old);
+  store.del('pm.doc');
 
   showStart();
   window.addEventListener('resize', () => { if (doc) applyView(); });

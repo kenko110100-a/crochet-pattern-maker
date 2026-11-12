@@ -184,3 +184,40 @@ body.guide { height: auto; }
 .note { color: var(--muted); font-size: 13px; margin-top: 8px !important; }
 .g-foot { margin-top: 36px !important; text-align: center; }
 @media (max-width: 640px) { .step { grid-template-columns: 1fr; } }
+
+/* ══ v2 layout: stitch bar across the top, chart library, fine-tune sliders ══ */
+#app { grid-template: 50px auto minmax(0, 1fr) / minmax(0, 1fr) 310px; grid-template-areas: 'bar bar' 'pal pal' 'stage side'; }
+#palette { border-right: 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 14px; padding: 6px 10px 7px; overflow: visible; max-height: 42vh; overflow-y: auto; }
+#palInfo { position: static; flex: 0 0 178px; border: 0; padding: 2px 0 0; min-height: 0; font-size: 11.5px; line-height: 1.35; }
+#palInfo b { font-size: 12px; }
+.pg-h { font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.pg-b { display: flex; flex-wrap: wrap; gap: 4px; align-items: stretch; }
+.pal { width: 46px; padding: 2px 1px 2px; border-radius: 7px; }
+.pal svg { width: 30px; height: 30px; }
+.pal span { font-size: 9.5px; }
+.pal.cable { width: 70px; } .pal.cable svg { width: 62px; height: 22px; margin: 4px 0; }
+.pal.text { width: auto; padding: 0 10px; justify-content: center; } .pal.text span { font-size: 11.5px; color: var(--text); }
+.pg .sw { width: 24px; height: 24px; aspect-ratio: auto; align-self: center; }
+.pg #customColor { align-self: center; }
+.row-tools { padding-left: 4px; align-items: center; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); }
+.panel h3.sub { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 4px; }
+.adj span { flex: 0 0 62px; color: var(--muted); } .adj input { flex: 1; min-width: 0; accent-color: var(--accent); } .adj output { flex: 0 0 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.panel .line .help { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; }
+#start { align-items: flex-start; }
+.start-card { margin: auto; }
+.modes { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.modes label input[type=checkbox] { margin: 0; }
+.modes select[name=st] { width: auto; flex: 1; min-width: 0; }
+#lib h2 { font-size: 13px; margin: 22px 0 8px; }
+.lib-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.lib-item { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+.lib-item:hover { border-color: var(--accent); }
+.lib-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-item span { grid-column: 1; font-size: 11.5px; color: var(--muted); }
+.lib-item button { grid-column: 2; grid-row: 1 / span 2; }
+@media (max-width: 900px) { #app { grid-template-columns: minmax(0, 1fr) 250px; } #palInfo { display: none; } }
+#title { flex: 1 1 110px; min-width: 60px; max-width: 260px; }
+#bar .grow { flex: 0 1 0; }
+#bar { gap: 6px; }
+@media (max-width: 1000px) { #bar a.btn.ghost, #selStyle { display: none; } #app { grid-template-columns: minmax(0, 1fr) 270px; } }
